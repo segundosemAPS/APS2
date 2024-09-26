@@ -1,0 +1,121 @@
+import random
+'''
+Calcula o totiente do número primo
+'''
+def totiente(numero):
+    if(primo(numero)):
+        return numero - 1
+    else:
+        return False
+
+'''
+Verifica se um número gerado é primo
+'''
+def primo(n):  # verifica se o número é primo
+    if (n <= 1):
+        return False
+    if (n <= 3):
+        return True
+    if (n % 2 == 0 or n % 3 == 0):
+        return False
+    i = 5
+    while(i * i <= n):
+        if (n % i == 0 or n % (i + 2) == 0):
+            return False
+        i += 6
+    return True
+
+'''
+Gera um número aleatório E, satisfazendo as condições
+'''
+def gera_E(num):
+    def mdc(n1, n2):
+        resto = 1
+        while(n2 != 0):
+            resto = n1 % n2
+            n1 = n2
+            n2 = resto
+        return n1
+    while True:
+        e = random.randrange(2, num)
+        if(mdc(num, e) == 1):
+            return e
+
+'''
+Gera um número primo aleatório
+'''
+def gera_primo():  # gera o número primo - p e q
+    while True:  # 2**2048 é o padrão de chaves RSA
+        x = random.randrange(1, 100)  # define o intervalo dos primos
+        if(primo(x) == True):
+            return x
+
+'''
+Função modular entre dois números
+'''
+def mod(a, b):  # função mod
+    if(a < b):
+        return a
+    else:
+        c = a % b
+        return c
+
+'''
+Cifra um texto
+'''
+def cifra(palavras, e, n):  # obtém as palavras e calcula a cifra
+    tam = len(palavras)
+    i = 0
+    lista = []
+    while(i < tam):
+        letra = palavras[i]
+        k = ord(letra)
+        k = k ** e
+        d = mod(k, n)
+        lista.append(d)
+        i += 1
+    return lista
+
+'''
+Descriptografa um texto criptografado
+'''
+def descifra(cifra, n, d):
+    lista = []
+    i = 0
+    tamanho = len(cifra)
+    # texto = cifra ^ d mod n
+    while i < tamanho:
+        resultado = cifra[i] ** d
+        texto = mod(resultado, n)
+        letra = chr(texto)
+        lista.append(letra)
+        i += 1
+    return lista
+
+'''
+Calcula a chave privada
+'''
+def calcula_chave_privada(toti, e):
+    d = 0
+    while(mod(d * e, toti) != 1):
+        d += 1
+    return d
+
+## MAIN
+if __name__ == '__main__':
+    texto = input("Insira a mensagem: ")
+    p = gera_primo()  # gera P aleatório
+    q = gera_primo()  # gera Q aleatório
+    n = p * q  # calcula N
+    y = totiente(p)  # calcula o totiente de P
+    x = totiente(q)  # calcula o totiente de Q
+    totiente_de_N = x * y  # calcula o totiente de N
+    e = gera_E(totiente_de_N)  # gera E
+    chave_publica = (n, e)
+    print('Sua chave pública:', chave_publica)
+    texto_cifrado = cifra(texto, e, n)
+    print('Sua mensagem criptografada:', texto_cifrado)
+    d = calcula_chave_privada(totiente_de_N, e)
+    print('Sua chave privada é:', d)
+    texto_original = descifra(texto_cifrado, n, d)
+    print('Sua mensagem original:', texto_original)
