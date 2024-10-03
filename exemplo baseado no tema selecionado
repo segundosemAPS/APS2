@@ -1,0 +1,102 @@
+import random
+from sympy import isprime
+
+# Funções auxiliares para geração de chaves RSA e criptografia
+
+def gerar_primo():
+    while True:
+        num = random.randint(100, 200)
+        if isprime(num):
+            return num
+
+def gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
+
+def gerar_E(totient_n):
+    e = random.randint(2, totient_n - 1)
+    while gcd(e, totient_n) != 1:
+        e = random.randint(2, totient_n - 1)
+    return e
+
+def calcular_chave_privada(totient_n, e):
+    k = 1
+    while (k * totient_n + 1) % e != 0:
+        k += 1
+    d = (k * totient_n + 1) // e
+    return d
+
+def criptografar(mensagem, e, n):
+    return pow(int(mensagem), e, n)
+
+def descifrar(cifra, d, n):
+    return pow(cifra, d, n)
+
+# Classe para representar contas bancárias seguras com RSA
+
+class ContaBancariaSegura:
+    def __init__(self, titular, numero_conta, saldo):
+        self.titular = titular
+        self.numero_conta = numero_conta
+        self.saldo = saldo
+        self.chave_publica, self.chave_privada = self.gerar_chaves()
+    
+    def gerar_chaves(self):
+        p = gerar_primo()
+        q = gerar_primo()
+        n = p * q
+        totient_n = (p - 1) * (q - 1)
+        e = gerar_E(totient_n)
+        d = calcular_chave_privada(totient_n, e)
+        return (n, e), (n, d)  # Retorna chave pública (n, e) e privada (n, d)
+
+    def criptografar_dados(self, valor, numero_conta_destinatario):
+        n_destinatario, e_destinatario = numero_conta_destinatario
+        dados = f"{self.numero_conta}-{valor}"
+        return criptografar(int(dados.replace("-", "")), e_destinatario, n_destinatario)
+    
+    def assinar_transacao(self, dados):
+        n, d = self.chave_privada
+        return criptografar(dados, d, n)
+
+    def verificar_assinatura(self, dados, assinatura, chave_publica_remetente):
+        n_remetente, e_remetente = chave_publica_remetente
+        dados_verificados = descifrar(assinatura, e_remetente, n_remetente)
+        return dados == dados_verificados
+
+# Função de transação bancária com segurança RSA
+
+def realizar_transacao(remetente, destinatario, valor):
+    # Criptografar os dados da transação com a chave pública do destinatário
+    dados_criptografados = remetente.criptografar_dados(valor, destinatario.chave_publica)
+    
+    # Assinar a transação com a chave privada do remetente
+    assinatura = remetente.assinar_transacao(dados_criptografados)
+
+    print(f"Transação Criptografada enviada: {dados_criptografados}")
+    print(f"Assinatura da Transação: {assinatura}")
+
+    # Verificar a assinatura no lado do destinatário
+    if destinatario.verificar_assinatura(dados_criptografados, assinatura, remetente.chave_publica):
+        if remetente.saldo >= valor:
+            remetente.saldo -= valor
+            destinatario.saldo += valor
+            print(f"Transação de R${valor} de {remetente.titular} para {destinatario.titular} foi concluída com sucesso!")
+        else:
+            print(f"Saldo insuficiente para realizar a transação.")
+    else:
+        print("Falha na verificação da assinatura. Transação inválida.")
+
+# Exemplo de uso do sistema
+
+# Criar contas
+remetente = ContaBancariaSegura("Alice", 1234, 1000)
+destinatario = ContaBancariaSegura("Bob", 5678, 500)
+
+# Realizar transação
+realizar_transacao(remetente, destinatario, 200)
+
+# Mostrar saldos após a transação
+print(f"Saldo de {remetente.titular}: R${remetente.saldo}")
+print(f"Saldo de {destinatario.titular}: R${destinatario.saldo}")
