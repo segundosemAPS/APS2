@@ -1,0 +1,214 @@
+import random
+from sympy import isprime
+
+# Cores ANSI
+COR_POUPECA = "\033[32m"  # Verde
+COR_CORRENTE = "\033[35m"  # Roxo
+COR_BLACK = "\033[90m"  # Cinza
+RESET = "\033[0m"  # Reseta a cor
+
+# Funções auxiliares para geração de chaves RSA
+def gerador_primo():
+    while True:
+        num = random.randint(100, 200)
+        if isprime(num):
+            return num
+
+def gerador_E(totient_n):
+    e = random.randint(2, totient_n - 1)
+    while gcd(e, totient_n) != 1:
+        e = random.randint(2, totient_n - 1)
+    return e
+
+def gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
+
+def calcular_chave_privada(totient_n, e):
+    d = 0
+    k = 1
+    while (k * totient_n + 1) % e != 0:
+        k += 1
+    d = (k * totient_n + 1) // e
+    return d
+
+def criptografar(mensagem, e, n):
+    return pow(int(mensagem), e, n)  # Convertendo a mensagem para inteiro
+
+def descifra(cifra, d, n):
+    return pow(cifra, d, n)
+
+# Classe que representa uma conta bancária
+class ContaBancaria:
+    def __init__(self, titular, tipo_conta, saldo):
+        self.titular = titular
+        self.tipo_conta = tipo_conta
+        self.saldo = saldo
+        self.chave_publica, self.chave_privada = self.gerar_chaves()
+        self.extrato = []
+        self.valor_criptografado_deposito = None  # Para armazenar o valor criptografado do último depósito
+
+    def gerar_chaves(self):
+        p = gerador_primo()
+        q = gerador_primo()
+        n = p * q
+        totient_n = (p - 1) * (q - 1)
+        e = gerador_E(totient_n)
+        d = calcular_chave_privada(totient_n, e)
+        return (n, e), (n, d)  # Retorna a chave pública (n, e) e a privada (n, d)
+
+    def criptografar(self, valor):
+        n, e = self.chave_publica
+        valor_centavos = int(valor * 100)  # Convertendo valor para centavos
+        return criptografar(valor_centavos, e, n)
+
+    def descifrar(self, cifra):
+        n, d = self.chave_privada
+        valor_centavos = descifra(cifra, d, n)
+        return valor_centavos / 100  # Convertendo centavos de volta para reais
+
+    def adicionar_extrato(self, descricao, valor):
+        self.extrato.append(f"{descricao}: R${valor:.2f}")
+
+    def mostrar_extrato(self):
+        print("\nExtrato Bancário:")
+        for item in self.extrato:
+            print(item)
+
+    def mostrar_info(self):
+        # Exibir informações da conta com a cor correspondente
+        cor = ''
+        if self.tipo_conta == 'poupança':
+            cor = COR_POUPECA
+        elif self.tipo_conta == 'corrente':
+            cor = COR_CORRENTE
+        elif self.tipo_conta == 'black':
+            cor = COR_BLACK
+
+        print(f"{cor}Titular: {self.titular}, Tipo de Conta: {self.tipo_conta}, Saldo: R${self.saldo:.2f}{RESET}")
+
+def realizar_transacao(remetente, destinatario, valor):
+    if remetente.saldo >= valor:
+        remetente.saldo -= valor
+        destinatario.saldo += valor
+
+        # Adiciona ao extrato
+        remetente.adicionar_extrato(f'Transferência enviada para {destinatario.titular}', -valor)
+        destinatario.adicionar_extrato(f'Transferência recebida de {remetente.titular}', valor)
+
+        print(f'\nTransação de R${valor} realizada com sucesso!')
+    else:
+        print('Saldo insuficiente para realizar a transação.')
+
+def depositar(conta, valor):
+    conta.saldo += valor
+    conta.adicionar_extrato("Depósito", valor)
+    conta.valor_criptografado_deposito = conta.criptografar(valor)  # Criptografa o valor do depósito
+    print(f"Depósito de R${valor} realizado com sucesso! Saldo atual: R${conta.saldo:.2f}")
+    print(f"Valor criptografado do depósito: {conta.valor_criptografado_deposito}")
+
+def pagar_conta(conta, valor):
+    if conta.saldo >= valor:
+        valor_criptografado = int(input("Insira o valor criptografado do depósito: "))
+        if valor_criptografado == conta.valor_criptografado_deposito:
+            conta.saldo -= valor
+            conta.adicionar_extrato("Pagamento de conta", -valor)
+            print(f'Pagamento de R${valor} realizado com sucesso!')
+        else:
+            print("Valor criptografado inválido. Não foi possível realizar o pagamento.")
+    else:
+        print("Saldo insuficiente para pagar a conta.")
+
+def main():
+    contas = {}
+    print("Sistema Bancário Seguro com RSA")
+
+    while len(contas) < 3:
+        print(f"\nCriando conta {len(contas) + 1} de 3")
+        titular = input("Nome do titular: ")
+        tipo_conta = input("Tipo de conta (poupança/corrente/black): ").lower()
+        saldo = float(input("Saldo inicial: "))
+        contas[titular] = ContaBancaria(titular, tipo_conta, saldo)
+        print(f'Conta criada para {titular} com sucesso!')
+        print(f"Chave Pública: {contas[titular].chave_publica}")
+        print(f"Chave Privada: {contas[titular].chave_privada}")
+
+    while True:
+        print("\n1. Fazer Login")
+        print("2. Sair")
+        escolha = input("Escolha uma opção: ")
+
+        if escolha == '1':
+            titular = input("Nome do titular: ")
+            if titular in contas:
+                conta = contas[titular]
+                chave_privada = input("Insira sua chave privada (n, d): ")
+                try:
+                    # Converte a chave privada inserida para uma tupla
+                    chave_privada_usuario = tuple(map(int, chave_privada.strip('()').split(',')))
+
+                    if chave_privada_usuario == conta.chave_privada:
+                        conta.mostrar_info()  # Exibe as informações da conta
+
+                        while True:
+                            print("\n1. Ver Saldo")
+                            print("2. Realizar Transação")
+                            print("3. Depositar")
+                            print("4. Pagar Conta")
+                            print("5. Ver Extrato")
+                            print("6. Sair")
+                            operacao = input("Escolha uma operação: ")
+
+                            if operacao == '1':
+                                print(f'Saldo atual: R${conta.saldo:.2f}')
+
+                            elif operacao == '2':
+                                destinatario = input("Nome do destinatário: ")
+                                if destinatario in contas:
+                                    valor = float(input("Valor da transação: "))
+                                    if valor > 0:
+                                        realizar_transacao(conta, contas[destinatario], valor)
+                                    else:
+                                        print('O valor da transação deve ser positivo.')
+                                else:
+                                    print('Destinatário não encontrado.')
+
+                            elif operacao == '3':
+                                valor = float(input("Valor do depósito: "))
+                                if valor > 0:
+                                    depositar(conta, valor)
+                                else:
+                                    print('Valor de depósito deve ser positivo.')
+
+                            elif operacao == '4':
+                                valor = float(input("Valor da conta a pagar: "))
+                                if valor > 0:
+                                    pagar_conta(conta, valor)
+                                else:
+                                    print('O valor deve ser positivo.')
+
+                            elif operacao == '5':
+                                conta.mostrar_extrato()
+
+                            elif operacao == '6':
+                                break
+
+                            else:
+                                print("Operação inválida.")
+                    else:
+                        print("Chave privada incorreta.")
+                except ValueError:
+                    print("Formato de chave privada inválido. Insira no formato (n, d).")
+            else:
+                print('Conta não encontrada.')
+
+        elif escolha == '2':
+            print("Saindo do sistema.")
+            break
+
+        else:
+            print("Opção inválida.")
+
+if __name__ == "__main__":
+    main()
